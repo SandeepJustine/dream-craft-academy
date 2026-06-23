@@ -1,0 +1,520 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String        @id @default(cuid()) @db.VarChar(100)
+  email        String        @unique
+  name         String?
+  password     String?
+  avatar       String?
+  role         String        @default("student")
+  bio          String?
+  phone        String?
+  country      String?
+  enrolledAt   DateTime      @default(now())
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  enrollments  Enrollment[]
+  progress     LessonProgress[]
+  applications Application[]
+  quizAttempts QuizAttempt[]
+  submissions  AssignmentSubmission[]
+  certificates Certificate[]
+  notes        Note[]
+  forumPosts   ForumPost[]
+  chatSent     ChatMessage[] @relation("SentMessages")
+  chatReceived ChatMessage[] @relation("ReceivedMessages")
+  feedbacks    CourseFeedback[]
+  uploadedResources LibraryResource[]
+  timeExtensions TimeExtension[]
+  grantedExtensions TimeExtension[] @relation("GrantedExtensions")
+  notifications Notification[]
+  requestedAppointments Appointment[] @relation("RequestedAppointments")
+  receivedAppointments Appointment[] @relation("ReceivedAppointments")
+  createdNewsletters Newsletter[] @relation("NewsletterCreator")
+  liveChatAssigned LiveChatSession[] @relation("LiveChatAssignee")
+  liveChatSent LiveChatMessage[] @relation("LiveChatSender")
+  certificateOrders CertificateOrder[]
+  donations         Donation[]
+}
+
+model Course {
+  id                 String        @id @default(cuid()) @db.VarChar(100)
+  title              String
+  description        String
+  category           String
+  level              String        @default("Beginner")
+  duration           String
+  image              String?
+  videoUrl           String?
+  instructor         String
+  featured           Boolean       @default(false)
+  enrolled           Int           @default(0)
+  rating             Float         @default(0)
+  certificateEnabled Boolean       @default(true)
+  passingScore       Float         @default(70)
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  modules            Module[]
+  enrollments        Enrollment[]
+  liveClasses        LiveClass[]
+  forum              Forum?
+  libraryResources   LibraryResource[]
+  feedbacks          CourseFeedback[]
+}
+
+model Module {
+  id          String   @id @default(cuid()) @db.VarChar(100)
+  courseId    String @db.VarChar(100)
+  title       String
+  description String?
+  order       Int      @default(0)
+  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lessons     Lesson[]
+  quizzes     Quiz[]
+  assignments Assignment[]
+}
+
+model Lesson {
+  id               String   @id @default(cuid()) @db.VarChar(100)
+  moduleId         String @db.VarChar(100)
+  title            String
+  content          String   @default("")   // Notes / text content
+  type             String   @default("text")
+  mediaUrl         String?                 // Legacy media field
+  videoUrl         String?                 // Video file or embed URL
+  audioUrl         String?                 // Audio link or embed code
+  codeSnippet      String?                 // Code snippet for webbook
+  pdfUrl           String?                 // PDF file URL
+  presentationUrl  String?                 // PPT / Google Slides / SlideShare URL
+  embedCode        String?                 // HTML embed/iframe code (YouTube, external tools)
+  externalUrl      String?                 // External reference link URL
+  resourceUrl      String?                 // Downloadable resource file URL (templates, workbooks, etc.)
+  duration         String   @default("10 min")
+  order            Int      @default(0)
+  module           Module   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  progress         LessonProgress[]
+  notes            Note[]
+}
+
+model Enrollment {
+  id             String           @id @default(cuid()) @db.VarChar(100)
+  userId         String @db.VarChar(100)
+  courseId       String @db.VarChar(100)
+  progress       Float            @default(0)
+  overallGrade   Float            @default(0)
+  letterGrade    String?
+  status         String           @default("active")
+  enrolledAt     DateTime         @default(now())
+  completedAt    DateTime?
+  lastAccessedAt DateTime         @default(now())
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course         Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lessonProgress LessonProgress[]
+  quizAttempts   QuizAttempt[]
+  submissions    AssignmentSubmission[]
+  certificate    Certificate?
+  feedback       CourseFeedback?
+
+  @@unique([userId, courseId])
+}
+
+model LessonProgress {
+  id           String      @id @default(cuid()) @db.VarChar(100)
+  userId       String @db.VarChar(100)
+  lessonId     String @db.VarChar(100)
+  enrollmentId String @db.VarChar(100)
+  completed    Boolean     @default(false)
+  completedAt  DateTime?
+  timeSpent    Int         @default(0)
+  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lesson       Lesson      @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  enrollment   Enrollment  @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, lessonId])
+}
+
+model Quiz {
+  id           String       @id @default(cuid()) @db.VarChar(100)
+  moduleId     String @db.VarChar(100)
+  title        String
+  description  String?
+  type         String       @default("practice")  // "practice" for module quizzes, "exam" for final exam
+  isFinalExam  Boolean      @default(false)        // true = course final exam
+  timeLimit    Int          @default(30)
+  passingScore Float        @default(70)
+  maxAttempts  Int          @default(3)
+  order        Int          @default(0)
+  module       Module       @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  questions    Question[]
+  attempts     QuizAttempt[]
+  timeExtensions TimeExtension[]
+}
+
+model Question {
+  id            String   @id @default(cuid()) @db.VarChar(100)
+  quizId        String @db.VarChar(100)
+  text          String
+  type          String   @default("multiple_choice")
+  options       String
+  correctAnswer String
+  explanation   String?
+  points        Int      @default(1)
+  order         Int      @default(0)
+  quiz          Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+}
+
+model QuizAttempt {
+  id           String      @id @default(cuid()) @db.VarChar(100)
+  userId       String @db.VarChar(100)
+  quizId       String @db.VarChar(100)
+  enrollmentId String @db.VarChar(100)
+  score        Float       @default(0)
+  maxScore     Float       @default(0)
+  answers      String      @default("{}")
+  passed       Boolean     @default(false)
+  timeSpent    Int         @default(0)
+  letterGrade  String?
+  startedAt    DateTime    @default(now())
+  completedAt  DateTime?
+  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  quiz         Quiz        @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  enrollment   Enrollment  @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+}
+
+model Assignment {
+  id          String   @id @default(cuid()) @db.VarChar(100)
+  moduleId    String @db.VarChar(100)
+  title       String
+  description String
+  type        String   @default("written")
+  maxScore    Float    @default(100)
+  dueDate     DateTime?
+  order       Int      @default(0)
+  module      Module   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  submissions AssignmentSubmission[]
+}
+
+model AssignmentSubmission {
+  id           String      @id @default(cuid()) @db.VarChar(100)
+  userId       String @db.VarChar(100)
+  assignmentId String @db.VarChar(100)
+  enrollmentId String @db.VarChar(100)
+  content      String      @default("")
+  fileUrl      String?
+  score        Float?
+  feedback     String?
+  status       String      @default("submitted")
+  submittedAt  DateTime    @default(now())
+  gradedAt     DateTime?
+  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assignment   Assignment  @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  enrollment   Enrollment  @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, assignmentId])
+}
+
+model Certificate {
+  id               String      @id @default(cuid()) @db.VarChar(100)
+  userId           String @db.VarChar(100)
+  courseId         String @db.VarChar(100)
+  enrollmentId     String @db.VarChar(100)      @unique
+  certificateNumber String     @unique
+  finalGrade       Float       @default(0)
+  letterGrade      String?
+  issuedAt         DateTime    @default(now())
+  user             User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  enrollment       Enrollment  @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  orders           CertificateOrder[]
+}
+
+model LiveClass {
+  id          String   @id @default(cuid()) @db.VarChar(100)
+  courseId    String @db.VarChar(100)
+  title       String
+  description String?
+  instructor  String
+  scheduledAt DateTime
+  duration    Int      @default(60)
+  meetingUrl  String?
+  status      String   @default("upcoming")
+  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+}
+
+model Note {
+  id        String   @id @default(cuid()) @db.VarChar(100)
+  userId    String @db.VarChar(100)
+  lessonId  String @db.VarChar(100)
+  content   String   @default("")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lesson    Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, lessonId])
+}
+
+model Application {
+  id             String   @id @default(cuid()) @db.VarChar(100)
+  firstName      String
+  lastName       String
+  email          String
+  phone          String?
+  country        String?
+  testimony      String?
+  courseInterest String?
+  status         String   @default("pending")
+  userId         String? @db.VarChar(100)
+  createdAt      DateTime @default(now())
+  user           User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+}
+
+model Forum {
+  id          String      @id @default(cuid()) @db.VarChar(100)
+  courseId     String @db.VarChar(100)      @unique
+  title       String
+  description String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  course      Course      @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  posts       ForumPost[]
+}
+
+model ForumPost {
+  id           String     @id @default(cuid()) @db.VarChar(100)
+  forumId      String @db.VarChar(100)
+  userId       String @db.VarChar(100)
+  parentId     String? @db.VarChar(100)
+  title        String?
+  content      String
+  isPinned     Boolean    @default(false)
+  isModerated  Boolean    @default(false)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  forum        Forum      @relation(fields: [forumId], references: [id], onDelete: Cascade)
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent       ForumPost? @relation("PostReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies      ForumPost[] @relation("PostReplies")
+}
+
+model ChatMessage {
+  id         String   @id @default(cuid()) @db.VarChar(100)
+  courseId   String @db.VarChar(100)
+  senderId   String @db.VarChar(100)
+  receiverId String @db.VarChar(100)
+  content    String
+  isRead     Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  sender     User     @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver   User     @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
+}
+
+model CourseFeedback {
+  id           String   @id @default(cuid()) @db.VarChar(100)
+  userId       String @db.VarChar(100)
+  courseId     String @db.VarChar(100)
+  enrollmentId String @db.VarChar(100)   @unique
+  rating       Int      @default(5)
+  feedback     String
+  createdAt    DateTime @default(now())
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course       Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  enrollment   Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+}
+
+model LibraryResource {
+  id          String   @id @default(cuid()) @db.VarChar(100)
+  courseId     String? @db.VarChar(100)
+  title       String
+  description String?
+  type        String   @default("book")
+  url         String?
+  coverImage  String?
+  author      String?
+  uploadedBy  String @db.VarChar(100)
+  createdAt   DateTime @default(now())
+  course      Course?  @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  uploader    User     @relation(fields: [uploadedBy], references: [id], onDelete: Cascade)
+}
+
+model PasswordReset {
+  id        String   @id @default(cuid()) @db.VarChar(100)
+  email     String
+  token     String   @unique
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model Notification {
+  id         String   @id @default(cuid()) @db.VarChar(100)
+  userId     String @db.VarChar(100)
+  type       String   // "enrollment", "completion", "message", "general"
+  title      String
+  message    String
+  isRead     Boolean  @default(false)
+  courseId   String? @db.VarChar(100)
+  link       String?
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model SiteSetting {
+  id    String @id @default(cuid()) @db.VarChar(100)
+  key   String @unique
+  value String
+}
+
+model TimeExtension {
+  id           String   @id @default(cuid()) @db.VarChar(100)
+  quizId       String @db.VarChar(100)
+  userId       String @db.VarChar(100)
+  attemptId    String? @db.VarChar(100)
+  extensionMinutes Int
+  reason       String
+  grantedBy    String @db.VarChar(100)
+  createdAt    DateTime @default(now())
+  quiz         Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  grantedByUser User    @relation("GrantedExtensions", fields: [grantedBy], references: [id], onDelete: Cascade)
+}
+
+model Appointment {
+  id            String   @id @default(cuid()) @db.VarChar(100)
+  title         String
+  description   String?
+  requesterId   String @db.VarChar(100)
+  recipientId   String @db.VarChar(100)
+  courseId      String? @db.VarChar(100)
+  date          DateTime
+  duration      Int      @default(30)
+  status        String   @default("pending")
+  location      String?
+  meetingUrl    String?
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  requester     User     @relation("RequestedAppointments", fields: [requesterId], references: [id], onDelete: Cascade)
+  recipient     User     @relation("ReceivedAppointments", fields: [recipientId], references: [id], onDelete: Cascade)
+}
+
+model NewsletterSubscriber {
+  id            String   @id @default(cuid()) @db.VarChar(100)
+  email         String   @unique
+  name          String?
+  isActive      Boolean  @default(true)
+  subscribedAt  DateTime @default(now())
+  unsubscribedAt DateTime?
+}
+
+model Newsletter {
+  id             String    @id @default(cuid()) @db.VarChar(100)
+  subject        String
+  content        String
+  status         String    @default("draft")
+  scheduledAt    DateTime?
+  sentAt         DateTime?
+  createdById    String @db.VarChar(100)
+  recipientCount Int       @default(0)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  createdBy      User      @relation("NewsletterCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  recipients     NewsletterRecipient[]
+}
+
+model NewsletterRecipient {
+  id           String    @id @default(cuid()) @db.VarChar(100)
+  newsletterId String @db.VarChar(100)
+  email        String
+  sentAt       DateTime  @default(now())
+  openedAt     DateTime?
+  newsletter   Newsletter @relation(fields: [newsletterId], references: [id], onDelete: Cascade)
+}
+
+model LiveChatSession {
+  id            String    @id @default(cuid()) @db.VarChar(100)
+  visitorName   String?
+  visitorEmail  String?
+  sessionId     String @db.VarChar(100)    @unique
+  status        String    @default("active")
+  assignedToId  String? @db.VarChar(100)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  assignedTo    User?     @relation("LiveChatAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  messages      LiveChatMessage[]
+}
+
+model LiveChatMessage {
+  id          String   @id @default(cuid()) @db.VarChar(100)
+  sessionId   String @db.VarChar(100)
+  content     String
+  senderType  String   @default("visitor")
+  senderId    String? @db.VarChar(100)
+  senderName  String?
+  isRead      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  session     LiveChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sender      User?    @relation("LiveChatSender", fields: [senderId], references: [id], onDelete: SetNull)
+}
+
+model CertificateOrder {
+  id                 String   @id @default(cuid()) @db.VarChar(100)
+  userId             String @db.VarChar(100)
+  certificateId      String? @db.VarChar(100)
+  orderType          String   @default("certificate")  // "certificate" or "diploma"
+  quantity           Int      @default(1)
+  amount             Float
+  currency           String   @default("MWK")
+  paymentMethod      String   // "bank", "airtel_money", "tnm_mpamba"
+  paymentStatus      String   @default("pending")  // "pending", "paid", "failed", "refunded"
+  orderStatus        String   @default("pending")  // "pending", "processing", "shipped", "delivered", "cancelled"
+  paymentReference   String?  // Transaction reference / receipt number from student
+  paymentProof       String?  // URL to uploaded payment proof
+  recipientName      String
+  recipientPhone     String?
+  recipientEmail     String?
+  shippingAddress    String?
+  city               String?
+  country            String   @default("Malawi")
+  notes              String?
+  adminNotes         String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  certificate        Certificate? @relation(fields: [certificateId], references: [id], onDelete: SetNull)
+}
+
+model Donation {
+  id                String   @id @default(cuid()) @db.VarChar(100)
+  donorName         String
+  donorEmail        String
+  donorPhone        String?
+  amountUsd         Float
+  amountMwk         Float
+  paymentMethod     String   // "bank", "airtel_money", "tnm_mpamba"
+  paymentStatus     String   @default("pending") // "pending", "confirmed", "failed"
+  paymentReference  String?  // Transaction reference from donor
+  message           String?  // Optional donor message
+  emailSentToDonor  Boolean  @default(false)
+  emailSentToAdmin  Boolean  @default(false)
+  userId            String? @db.VarChar(100)  // If donor is a logged-in user
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  user              User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+}
+
+model PageView {
+  id          String   @id @default(cuid()) @db.VarChar(100)
+  page        String
+  visitorId   String @db.VarChar(100)
+  referrer    String?
+  userAgent   String?
+  userId      String? @db.VarChar(100)
+  createdAt   DateTime @default(now())
+}
